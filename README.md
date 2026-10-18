@@ -156,6 +156,8 @@ against origin/master: 13 functions touched
   new functions: 9 called at one place, 3 of one statement, 0 passing through
 ```
 
+`-md` writes the same as a Markdown table, to paste in a pull request.
+
 It never fails: the signs are to weigh, as a function of one place with a
 name of its own may well be worth it. With `-json`, it writes the same for
 a model.
@@ -191,7 +193,7 @@ Pin a version: a new version may count otherwise, and move the baseline.
 ```
 abc [-max 17] [-max-lines 40] [-max-nesting 3] [-max-cyclo 10]
     [-max-case 10] [-floor 0.3] [-baseline .abc-baseline] [-write]
-    [-v] [-func name] [-diff rev] [-json] [patterns]
+    [-v] [-func name] [-diff rev [-md]] [-json] [patterns]
 ```
 
 The patterns are directories, `./...` by default; `dir/...` takes those

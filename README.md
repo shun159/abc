@@ -131,6 +131,35 @@ gensim/purity.go:60:1: gensim fingerprinter.value
 The name is a function's (`value`, `fingerprinter.value`) or its
 directory's and its (`gensim fingerprinter.value`).
 
+## What a change did
+
+`-diff rev` measures the functions a change touched, since the git
+revision rev, before and after, instead of checking: a table for a pull
+request, and the signs of a split that only spreads the code. A function
+the change added is told when it is called at one place only, is of one
+statement, or passes its arguments on to another (Ousterhout's
+pass-through method): alone, each is easy to read; together, the reader
+jumps more. The sum tells the largest ABC size, all of them, and how many
+functions, before and after: a split that simplifies lowers the largest,
+not the sum alone.
+
+```
+$ abc -diff origin/master ./...
+against origin/master: 13 functions touched
+
+  abc             lines           cyclo         function
+  20.8 → 14.2     28.6 → 17       7.7 → 5.5     internal/champ Node.set
+  - → 4.6         - → 3.9         - → 1         internal/champ Node.pushedDown  (new, called at one place)
+  ...
+
+  largest abc 20.8 → 16.8, total abc 60.6 → 68.9, functions 3 → 13
+  new functions: 9 called at one place, 3 of one statement, 0 passing through
+```
+
+It never fails: the signs are to weigh, as a function of one place with a
+name of its own may well be worth it. With `-json`, it writes the same for
+a model.
+
 ## JSON, for a model
 
 `-json` writes what `-func` tells, or the problems of a check, as JSON.
@@ -162,7 +191,7 @@ Pin a version: a new version may count otherwise, and move the baseline.
 ```
 abc [-max 17] [-max-lines 40] [-max-nesting 3] [-max-cyclo 10]
     [-max-case 10] [-floor 0.3] [-baseline .abc-baseline] [-write]
-    [-v] [-func name] [-json] [patterns]
+    [-v] [-func name] [-diff rev] [-json] [patterns]
 ```
 
 The patterns are directories, `./...` by default; `dir/...` takes those

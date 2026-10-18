@@ -170,3 +170,21 @@ func TestExplain(t *testing.T) {
 		t.Error("explained a function that is not there")
 	}
 }
+
+func TestTheFieldsOfALiteralAlikeCountLess(t *testing.T) {
+	s := measureSrc(t, `func f(seed uint64) *sim {
+	return &sim{
+		nodes:   make(map[string]*node),
+		cuts:    make(map[[2]string]bool),
+		held:    make(map[[2]string]bool),
+		paused:  make(map[string]bool),
+		byPID:   make(map[pid]*process),
+		aliases: make(map[ref]*alias),
+	}
+}`)
+	// Six makes; the first counts, the rest less as they repeat it, of
+	// other types of maps. The lines are the statement's.
+	if s.b >= 3 || s.lines != 8 {
+		t.Errorf("B%g, lines %g; want B under 3, of 6 calls, and 8 lines", s.b, s.lines)
+	}
+}

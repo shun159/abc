@@ -9,9 +9,10 @@ import (
 // Regular code reads faster than it counts: once the reader knows the
 // first of statements alike, the next ones are read as repeats of it
 // (Jbara and Feitelson, "How programmers read regular code", EMSE 2017).
-// So in every list of siblings, the statements of a block or the cases of
-// a switch or a select, a sibling counts as much as it is new: all of it
-// for the first, and less for one more like a sibling before it.
+// So in every list of siblings, the statements of a block, the cases of a
+// switch or a select, or the elements of a literal, a sibling counts as
+// much as it is new: all of it for the first, and less for one more like a
+// sibling before it.
 //
 // Alike is by shape: the kinds of the nodes in order, with identifiers and
 // literals but of a kind, so that m.Term = d.uint() and m.To = d.pid() are
@@ -61,8 +62,17 @@ type part struct {
 // counted is what p adds to its function.
 func (p part) counted() vec { return p.whole.scale(1 - p.repeat) }
 
-// list counts siblings, each as much as it is new.
-func (k *counter) list(nodes []ast.Node) vec {
+// list counts siblings, each as much as it is new, and its lines.
+func (k *counter) list(nodes []ast.Node) vec { return k.siblings(nodes, true) }
+
+// elems counts the elements of a literal as siblings, each as much as it
+// is new; their lines are of the statement that holds the literal, many
+// elements may share one.
+func (k *counter) elems(nodes []ast.Node) vec { return k.siblings(nodes, false) }
+
+// siblings counts nodes, each as much as it is new, with its lines if
+// lines.
+func (k *counter) siblings(nodes []ast.Node, lines bool) vec {
 	var total vec
 	var shapes [][]string
 	for _, n := range nodes {
@@ -74,7 +84,7 @@ func (k *counter) list(nodes []ast.Node) vec {
 			}
 		}
 		shapes = append(shapes, sh)
-		p := k.count(n)
+		p := k.count(n, lines)
 		p.repeat = k.repeat(alike)
 		if like >= 0 && p.repeat > 0 {
 			p.like = nodes[like]
@@ -85,9 +95,9 @@ func (k *counter) list(nodes []ast.Node) vec {
 	return total
 }
 
-// count counts the sibling n, its lines with it, and keeps a place for it
-// before its own parts, if explain.
-func (k *counter) count(n ast.Node) part {
+// count counts the sibling n, its lines with it if lines, and keeps a
+// place for it before its own parts, if explain.
+func (k *counter) count(n ast.Node, lines bool) part {
 	p := part{at: n, depth: k.depth}
 	if k.explain {
 		k.parts = append(k.parts, p)
@@ -95,7 +105,9 @@ func (k *counter) count(n ast.Node) part {
 	k.depth++
 	p.whole = k.node(n)
 	k.depth--
-	p.whole.lines += k.span(n)
+	if lines {
+		p.whole.lines += k.span(n)
+	}
 	return p
 }
 
@@ -149,7 +161,7 @@ func own(x ast.Node) vec {
 }
 
 // lists counts the parts of x, if it holds a list of siblings: a block,
-// or a case and what it is for.
+// a case and what it is for, or a literal and its elements.
 func (k *counter) lists(x ast.Node) (v vec, holds bool) {
 	switch c := x.(type) {
 	case *ast.BlockStmt:
@@ -164,6 +176,11 @@ func (k *counter) lists(x ast.Node) (v vec, holds bool) {
 			v = k.node(c.Comm)
 		}
 		return v.add(k.inner(stmts(c.Body))), true
+	case *ast.CompositeLit:
+		if c.Type != nil {
+			v = k.node(c.Type)
+		}
+		return v.add(k.elems(exprs(c.Elts))), true
 	}
 	return vec{}, false
 }
@@ -175,6 +192,14 @@ func (k *counter) inner(nodes []ast.Node) vec {
 		v.lines -= k.span(n)
 	}
 	return v
+}
+
+func exprs(es []ast.Expr) []ast.Node {
+	ns := make([]ast.Node, len(es))
+	for i, e := range es {
+		ns[i] = e
+	}
+	return ns
 }
 
 func stmts(ss []ast.Stmt) []ast.Node {

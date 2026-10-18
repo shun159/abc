@@ -37,14 +37,16 @@ Tests (`_test.go`) and `testdata` are left out.
 Code of statements alike reads faster than it counts: once the reader
 knows the first, the next ones are read as repeats of it (Jbara and
 Feitelson, "How programmers read regular code", Empirical Software
-Engineering, 2017). So in every list of siblings, the statements of a block
-or the cases of a switch or a select, each counts as much as it is new:
+Engineering, 2017). So in every list of siblings, the statements of a block,
+the cases of a switch or a select, or the elements of a literal, each counts
+as much as it is new (the lines of a literal's elements are its statement's):
 
     counted = its size × (1 − repeat)
     repeat  = (likeness − floor) / (1 − floor), if likeness > floor
 
 where likeness, 0 to 1, is to the most like sibling before it, of the same
-kind (two ifs, two assignments, two cases), by the shape of their code:
+kind (two ifs, two assignments, two cases, two fields of a literal), by the
+shape of their code:
 the kinds of their nodes in order, identifiers and literals but of a kind.
 `-floor` (0.3) is the likeness of any code, which takes nothing off. It
 holds for the ABC size, the paths and the lines alike.

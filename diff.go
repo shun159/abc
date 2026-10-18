@@ -251,6 +251,28 @@ func reportDiff(w *bytes.Buffer, rev string, cs []changed) {
 	}
 }
 
+// markdownDiff writes what the change did as a Markdown table, a row a
+// function, and the sum under it, for the body of a pull request.
+func markdownDiff(w *bytes.Buffer, cs []changed) {
+	sum := summarize(cs)
+	fmt.Fprintln(w, "| function | abc | lines | cyclo | |")
+	fmt.Fprintln(w, "|---|---|---|---|---|")
+	for _, c := range cs {
+		note := strings.Trim(strings.TrimSpace(c.split.describe()), "()")
+		fmt.Fprintf(w, "| `%s` | %s | %s | %s | %s |\n", c.key,
+			change(c, func(s score) float64 { return s.abc() }),
+			change(c, func(s score) float64 { return s.lines }),
+			change(c, func(s score) float64 { return s.cyclo }), note)
+	}
+	fmt.Fprintf(w, "\nLargest abc %g → %g, total abc %g → %g, functions %g → %g.",
+		sum.largest[0], sum.largest[1], round(sum.total[0]), round(sum.total[1]), sum.count[0], sum.count[1])
+	if sum.used1+sum.tiny+sum.through > 0 {
+		fmt.Fprintf(w, " New functions: %d called at one place, %d of one statement, %d passing through.",
+			sum.used1, sum.tiny, sum.through)
+	}
+	fmt.Fprintln(w)
+}
+
 // change is a measure of c before → after, - where it is not.
 func change(c changed, of func(score) float64) string {
 	side := func(v *version) string {
@@ -262,17 +284,22 @@ func change(c changed, of func(score) float64) string {
 	return side(c.before) + " → " + side(c.after)
 }
 
-// runDiff measures the change since rev, and writes it, as text or JSON.
-func runDiff(rev string, patterns []string, opts options, asJSON bool) error {
+// runDiff measures the change since rev, and writes it, as text, JSON,
+// or Markdown for the body of a pull request.
+func runDiff(rev string, patterns []string, opts options, out output) error {
 	cs, err := diffAgainst(rev, patterns, opts)
 	if err != nil {
 		return err
 	}
-	if asJSON {
+	if out.json {
 		return writeJSON(os.Stdout, diffJSON(rev, cs))
 	}
 	var b bytes.Buffer
-	reportDiff(&b, rev, cs)
+	if out.markdown {
+		markdownDiff(&b, cs)
+	} else {
+		reportDiff(&b, rev, cs)
+	}
 	_, err = os.Stdout.Write(b.Bytes())
 	return err
 }

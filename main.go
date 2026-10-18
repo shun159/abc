@@ -8,7 +8,7 @@
 //
 //	abc [-max 17] [-max-lines 40] [-max-nesting 3] [-max-cyclo 10]
 //	    [-max-case 10] [-floor 0.3] [-baseline .abc-baseline] [-write]
-//	    [-v] [-func name] [-diff rev] [-json] [patterns]
+//	    [-v] [-func name] [-diff rev [-md]] [-json] [patterns]
 //
 // The patterns are directories, ./... by default; dir/... takes those
 // under dir too. Tests are left out.
@@ -28,7 +28,7 @@
 //
 // -diff rev measures the functions changed since the git revision rev,
 // before and after, and the signs of a split that only spreads the code,
-// instead of checking.
+// instead of checking; -md writes it as Markdown, for a pull request.
 //
 // -func name explains the functions of that name, or directory and name,
 // instead: their sizes, and each statement and case by what it adds, less
@@ -60,13 +60,14 @@ func main() {
 	focus := flag.String("func", "", "explain the functions of this name, or directory and name: where their size is")
 	asJSON := flag.Bool("json", false, "write what -func explains, or the problems, as JSON")
 	against := flag.String("diff", "", "measure the functions changed since this git revision, before and after, not check")
+	markdown := flag.Bool("md", false, "write -diff as Markdown, for the body of a pull request")
 	flag.Parse()
 	patterns := flag.Args()
 	if len(patterns) == 0 {
 		patterns = []string{"./..."}
 	}
 	opts := options{floor: *floor, focus: *focus}
-	out := output{rewrite: *rewrite, verbose: *verbose, json: *asJSON, diff: *against}
+	out := output{rewrite: *rewrite, verbose: *verbose, json: *asJSON, markdown: *markdown, diff: *against}
 	if err := run(patterns, *path, ms(), opts, out); err != nil {
 		fmt.Fprintln(os.Stderr, "abc:", err)
 		os.Exit(1)
@@ -87,13 +88,13 @@ func metricFlags() func() []metric {
 // An output is what run does with the sizes: rewrite the baseline, list
 // those over a limit, and write JSON for a model, not text.
 type output struct {
-	rewrite, verbose, json bool
-	diff                   string // a revision to measure the change since
+	rewrite, verbose, json, markdown bool
+	diff                             string // a revision to measure the change since
 }
 
 func run(patterns []string, path string, ms []metric, opts options, out output) error {
 	if out.diff != "" {
-		return runDiff(out.diff, patterns, opts, out.json)
+		return runDiff(out.diff, patterns, opts, out)
 	}
 	scores, err := scan(patterns, names(ms), opts)
 	if err != nil {

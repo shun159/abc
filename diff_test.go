@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,5 +75,12 @@ func g(x int) int { return x * 2 }
 	}
 	if sum := summarize(cs); sum.count != [2]float64{1, 5} || sum.used1 != 3 {
 		t.Errorf("summary %+v; want 1 → 5 functions, 3 called once", sum)
+	}
+	var md bytes.Buffer
+	markdownDiff(&md, cs)
+	for _, want := range []string{"| function | abc |", "| `. twice` | - → ", "passing through |", "functions 1 → 5."} {
+		if !strings.Contains(md.String(), want) {
+			t.Errorf("no %q in\n%s", want, md.String())
+		}
 	}
 }

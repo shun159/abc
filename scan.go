@@ -135,6 +135,12 @@ func parse(path string) (*token.FileSet, *ast.File, []string, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	return parseSource(path, data)
+}
+
+// parseSource parses data, the source of the file path, and splits it in
+// lines.
+func parseSource(path string, data []byte) (*token.FileSet, *ast.File, []string, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, path, data, parser.ParseComments)
 	return fset, f, strings.Split(string(data), "\n"), err

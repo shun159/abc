@@ -148,3 +148,56 @@ func writeJSON(w io.Writer, v any) error {
 	e.SetIndent("", "  ")
 	return e.Encode(v)
 }
+
+// A jsonChange is what -diff tells, for a model: each function the change
+// touched, and the sum, to tell a split that simplifies from one that
+// spreads.
+type jsonChange struct {
+	Against   string        `json:"against"`
+	Functions []jsonChanged `json:"functions"`
+	Largest   [2]float64    `json:"largest"` // ABC size, before and after
+	Total     [2]float64    `json:"total"`
+	Count     [2]float64    `json:"count"`
+}
+
+type jsonChanged struct {
+	Func   string     `json:"func"`
+	Before *jsonSizes `json:"before,omitempty"` // absent if new
+	After  *jsonSizes `json:"after,omitempty"`  // absent if gone
+	Split  *jsonSplit `json:"split,omitempty"`  // of a new function
+}
+
+type jsonSizes struct {
+	Pos     string  `json:"pos"`
+	ABC     float64 `json:"abc"`
+	Lines   float64 `json:"lines"`
+	Cyclo   float64 `json:"cyclo"`
+	Nesting int     `json:"nesting"`
+}
+
+type jsonSplit struct {
+	Calls       int  `json:"calls"`
+	Statements  int  `json:"statements"`
+	PassThrough bool `json:"pass_through"`
+}
+
+func diffJSON(rev string, cs []changed) jsonChange {
+	sum := summarize(cs)
+	j := jsonChange{Against: rev, Functions: []jsonChanged{}, Largest: sum.largest, Count: sum.count,
+		Total: [2]float64{round(sum.total[0]), round(sum.total[1])}}
+	for _, c := range cs {
+		jc := jsonChanged{Func: c.key, Before: sizesOf(c.before), After: sizesOf(c.after)}
+		if c.split != nil {
+			jc.Split = &jsonSplit{c.split.calls, c.split.statements, c.split.passThrough}
+		}
+		j.Functions = append(j.Functions, jc)
+	}
+	return j
+}
+
+func sizesOf(v *version) *jsonSizes {
+	if v == nil {
+		return nil
+	}
+	return &jsonSizes{v.s.pos, v.s.abc(), v.s.lines, v.s.cyclo, v.s.nesting}
+}

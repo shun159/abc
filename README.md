@@ -110,6 +110,39 @@ holds, `abc -write` raises its entry; abc says so instead of asking to
 split it. The reason is required. A case over its limit is left out only
 by naming `case`.
 
+## Hot paths
+
+Code every operation runs is marked hot, with the benchmarks that measure
+it, those of its package or of another, after its directory:
+
+```go
+// put writes k, under the lock of its shard.
+//
+//abc:hot BenchmarkPut,BenchmarkMixed the path of every write
+func (x *hamtIndex[K, V]) put(...) {
+```
+
+It leaves nothing out, as `//abc:disable` does: it tells that a change to
+the function is to be measured, and by what. `-diff` says so of a hot
+function the change touched, and `-hot` checks that its benchmarks are
+there, failing if not, and lists the calls in it the compiler does not
+inline, with the compiler's reason:
+
+```
+$ abc -hot ./kvs
+kvs/index_tree.go:181:1: kvs treeIndex.ascend: hot, measured by BenchmarkOrdered
+  line 182: cursors not inlined: function too complex: cost 213 exceeds budget 80
+  line 200: down not inlined: function too complex: cost 235 exceeds budget 80
+```
+
+A split of a hot path most often costs such a call, a function over the
+inliner's budget, or one it could inline and did not there: a small
+function of another package, in a generic body. `-hot` compiles each
+package with its tests (`go test -c -gcflags=-m=2`), which instantiate
+its generic code; a generic function no test instantiates is told so. The
+calls are matched to the compiler's by name, so of two functions of one
+name, it gives both reasons.
+
 ## Asking about one function
 
 `-func` tells where a function's size is: each statement and case, by what
@@ -193,7 +226,7 @@ Pin a version: a new version may count otherwise, and move the baseline.
 ```
 abc [-max 17] [-max-lines 40] [-max-nesting 3] [-max-cyclo 10]
     [-max-case 10] [-floor 0.3] [-baseline .abc-baseline] [-write]
-    [-v] [-func name] [-diff rev [-md]] [-json] [patterns]
+    [-v] [-func name] [-diff rev [-md]] [-hot] [-json] [patterns]
 ```
 
 The patterns are directories, `./...` by default; `dir/...` takes those

@@ -20,7 +20,8 @@ type version struct {
 	s    score
 	text string // its source, to tell whether it changed
 	decl *ast.FuncDecl
-	path string // of its file
+	path string   // of its file
+	hot  []string // the benchmarks that measure it, if marked hot
 }
 
 // A changed is a function the change touched: before, after, or both.
@@ -141,7 +142,7 @@ func versionsOf(path string, data []byte, opts options, vs map[string]*version) 
 		}
 		s := measureAt(fset, src, path, fn, opts)
 		text := string(data[fset.Position(fn.Pos()).Offset:fset.Position(fn.End()).Offset])
-		vs[s.key] = &version{s, text, fn, path}
+		vs[s.key] = &version{s, text, fn, path, hotOf(fn)}
 	}
 	return nil
 }
@@ -241,7 +242,7 @@ func reportDiff(w *bytes.Buffer, rev string, cs []changed) {
 			change(c, func(s score) float64 { return s.abc() }),
 			change(c, func(s score) float64 { return s.lines }),
 			change(c, func(s score) float64 { return s.cyclo }),
-			c.key, c.split.describe())
+			c.key, c.split.describe()+hotNote(c))
 	}
 	fmt.Fprintf(w, "\n  largest abc %g → %g, total abc %g → %g, functions %g → %g\n",
 		sum.largest[0], sum.largest[1], round(sum.total[0]), round(sum.total[1]), sum.count[0], sum.count[1])
@@ -258,7 +259,7 @@ func markdownDiff(w *bytes.Buffer, cs []changed) {
 	fmt.Fprintln(w, "| function | abc | lines | cyclo | |")
 	fmt.Fprintln(w, "|---|---|---|---|---|")
 	for _, c := range cs {
-		note := strings.Trim(strings.TrimSpace(c.split.describe()), "()")
+		note := strings.Trim(strings.TrimSpace(c.split.describe()), "()") + hotNote(c)
 		fmt.Fprintf(w, "| `%s` | %s | %s | %s | %s |\n", c.key,
 			change(c, func(s score) float64 { return s.abc() }),
 			change(c, func(s score) float64 { return s.lines }),
@@ -271,6 +272,15 @@ func markdownDiff(w *bytes.Buffer, cs []changed) {
 			sum.used1, sum.tiny, sum.through)
 	}
 	fmt.Fprintln(w)
+}
+
+// hotNote tells a function marked hot, after the change, by what to
+// measure it.
+func hotNote(c changed) string {
+	if c.after == nil || c.after.hot == nil {
+		return ""
+	}
+	return "  hot: measure with " + strings.Join(c.after.hot, ", ")
 }
 
 // change is a measure of c before → after, - where it is not.
